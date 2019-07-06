@@ -1,11 +1,12 @@
 import cv2
 import numpy as np
-#from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 
 def crop(img_in,row1,row2,col1,col2):
     """
     cropping an imag, providing the correct index
     only a simple check will be performed
+    I am assuming indexes are integer
     """
     h,w,c = img_in.shape
     assert(row1<=row2 and col1<=col2)
