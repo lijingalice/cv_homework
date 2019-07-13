@@ -1,0 +1,52 @@
+I have read the wikipedia page on ransac and many parts of the answers below are based on that.
+
+First of all, I am not convinced that the algorithm given in the assignment is a correct one. Let’s assume there are 2 sets S1 and S2, each of which defines a good transformation individually and the # of S1 is larger than S2, so our target is to find the transformation of S1. 
+
+In this case, if we just randomly select 4 points to start the algorithm, it’s likely that we will select points in S2, and we will stuck there and never be able to select any points in S1. 
+
+Therefore, I propose changing the algorithm to 
+
+1. Choose 4 pair of points randomly in our matching points. Those four called "inlier" (中文： 内点) while others "outlier" (中文： 外点)
+2. Get the homography of the inliers
+3. Use this computed homography to test all the other outliers. And separated them by using a threshold into two parts:
+    a. new inliers which is satisfied our computed homography
+    b. new outliers which is not satisfied by our computed homography.
+4. if there are new inliers, add the new inliers to inliers then goto step 2; otherwise goto 5
+5. if the number is iterations is less than k, go back to 1
+
+The best model is defined here as the model has the largest number of inliers.
+
+Now back to my answers to questions:
+
+Follow up 1: use distances between predicted and targeted points: (x_pred-x_targ)^2+(y_pred-y_targ)^2
+
+Follow up 2: now the k will be well defined under our new algorithm. Assume we know the proportion of inliers w, which can be estimated by running this a few times. We need 4 points to start the algorithm (step 1), as long as we start with inliers, we will be okay. When there’s bad point, which has a probability of (1-w^4), then we may fail. Now we repeat k times, the total probability of failure is (1-w^4)^k. Let’s limit this to be 1-p, which sets up the equation:
+
+(1-p)=(1-w^4)^k => k=log(1-p)/log(1-w^4)
+
+
+
+Pseudo Code:
+
+th — a predefined threshhold
+k — iteration times
+fit — a function defined in Follow up 1
+largestN - the number of inliers of the model
+total — total sets of points
+
+for iter = 1:k
+  inliers=randomly select 4 points
+  outliers=total-inliers
+  go=true
+  while go
+    model=calculate using inliers
+    for point in outliers
+      go=false
+      if fit(model,point)<th
+        inliers=inliers+point
+        outliers=outliers-point
+        go=true
+  if len(inliers)>largestN
+    largestN=len(inliers)
+    save model
+  
