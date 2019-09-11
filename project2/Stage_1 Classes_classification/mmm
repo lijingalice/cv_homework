@@ -1,0 +1,137 @@
+3c3
+< from torch.utils.data import  DataLoader
+---
+> from torch.utils.data import DataLoader
+5c5
+< from Classes_Network import *
+---
+> from Species_Network import *
+17,18c17,18
+< TRAIN_ANNO = 'Classes_train_annotation.csv'
+< VAL_ANNO = 'Classes_val_annotation.csv'
+---
+> TRAIN_ANNO = 'Species_train_annotation.csv'
+> VAL_ANNO = 'Species_val_annotation.csv'
+19a20
+> SPECIES = ['rabbits', 'rats', 'chickens']
+44c45
+<         label_class = int(self.file_info.iloc[idx]['classes'])
+---
+>         label_species = int(self.file_info.iloc[idx]['species'])
+46c47
+<         sample = {'image': image, 'classes': label_class}
+---
+>         sample = {'image': image, 'species': label_species}
+78c79
+<     print(idx, sample['image'].shape, CLASSES[sample['classes']])
+---
+>     print(idx, sample['image'].shape, SPECIES[sample['species']])
+82c83
+< #visualize_dataset()
+---
+> visualize_dataset()
+84c85
+< def train_model(model, criterion, optimizer, scheduler, num_epochs=50, lam=1.0):
+---
+> def train_model(model, criterion, optimizer, scheduler, num_epochs=50, lam=0.1):
+86c87
+<     Accuracy_list_classes = {'train': [], 'val': []}
+---
+>     Accuracy_list_species = {'train': [], 'val': []}
+103c104
+<             corrects_classes = 0
+---
+>             corrects_species = 0
+108c109
+<                 labels_classes = data['classes'].to(device)
+---
+>                 labels_species = data['species'].to(device)
+112c113,114
+<                     x_classes = model(inputs)
+---
+>                     x_species = model(inputs)
+>                     x_species = x_species.view(-1,3)
+114,116c116
+<                     x_classes = x_classes.view(-1, 2)
+< 
+<                     _, preds_classes = torch.max(x_classes, 1)
+---
+>                     _, preds_species = torch.max(x_species, 1)
+121c121
+<                     loss = criterion(x_classes, labels_classes) + lam * reg
+---
+>                     loss = criterion(x_species, labels_species) + lam * reg
+129c129
+<                 corrects_classes += torch.sum(preds_classes == labels_classes)
+---
+>                 corrects_species += torch.sum(preds_species == labels_species)
+134,135c134,135
+<             epoch_acc_classes = corrects_classes.double() / len(data_loaders[phase].dataset)
+<             epoch_acc = epoch_acc_classes
+---
+>             epoch_acc_species = corrects_species.double() / len(data_loaders[phase].dataset)
+>             epoch_acc = epoch_acc_species
+137,138c137,138
+<             Accuracy_list_classes[phase].append(100 * epoch_acc_classes)
+<             print('{} Loss: {:.4f}  Acc_classes: {:.2%}'.format(phase, epoch_loss,epoch_acc_classes))
+---
+>             Accuracy_list_species[phase].append(100 * epoch_acc_species)
+>             print('{} Loss: {:.4f}  Acc_species: {:.2%}'.format(phase, epoch_loss,epoch_acc_species))
+142c142
+<                 best_acc = epoch_acc_classes
+---
+>                 best_acc = epoch_acc_species
+144c144
+<                 print('Best val classes Acc: {:.2%}'.format(best_acc))
+---
+>                 print('Best val species Acc: {:.2%}'.format(best_acc))
+148,149c148,149
+<     print('Best val classes Acc: {:.2%}'.format(best_acc))
+<     return model, Loss_list,Accuracy_list_classes
+---
+>     print('Best val species Acc: {:.2%}'.format(best_acc))
+>     return model, Loss_list,Accuracy_list_species
+164,165c164,165
+<             exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1) # Decay LR by a factor of 0.1 every 5 epochs
+<             for lam in [0,0.1,10]:
+---
+>             exp_lr_scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1) # Decay LR by a factor of 0.1 every 1 epochs
+>             for lam in [0,0.1,1.0]:
+167c167
+<                 model, Loss_list, Accuracy_list_classes = train_model(network, criterion, optimizer, exp_lr_scheduler, num_epochs=20, lam=lam)
+---
+>                 model, Loss_list, Accuracy_list_species = train_model(network, criterion, optimizer, exp_lr_scheduler, num_epochs=20, lam=lam)
+170,171c170,171
+<                 y5 = Accuracy_list_classes["train"]
+<                 y6 = Accuracy_list_classes["val"]
+---
+>                 y5 = Accuracy_list_species["train"]
+>                 y6 = Accuracy_list_species["val"]
+175,177c175,177
+<                 plt.title('train and val Classes_acc vs. epoches')
+<                 plt.ylabel('Classes_accuracy')
+<                 plt.savefig("train and val Classes_acc vs epoches" + "Net_" + network_class + "_" + method + "_lr_" + str(lr) + "_lam_" + str(lam) + ".jpg")
+---
+>                 plt.title('train and val Species acc vs. epoches')
+>                 plt.ylabel('Species accuracy')
+>                 plt.savefig("train and val Species acc vs epoches.jpg" + "Net_" + network_class + "_" + method + "_lr_" + str(lr) + "_lam_" + str(lam) + ".jpg")
+180c180
+< ############################################ Visualization ###############################################
+---
+> ######################################## Visualization ##################################
+186c186
+<             labels_classes = data['classes'].to(device)
+---
+>             labels_species = data['species'].to(device)
+188,190c188,190
+<             x_classes = model(inputs.to(device))
+<             x_classes=x_classes.view( -1,2)
+<             _, preds_classes = torch.max(x_classes, 1)
+---
+>             x_species = model(inputs.to(device))
+>             x_species = x_species.view(-1,3)
+>             _, preds_species = torch.max(x_species, 1)
+194c194
+<             plt.title('predicted classes: {}\n ground-truth classes:{}'.format(CLASSES[preds_classes],CLASSES[labels_classes]))
+---
+>             plt.title('predicted species: {}\n ground-truth species:{}'.format(SPECIES[preds_species],SPECIES[labels_species]))
