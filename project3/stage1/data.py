@@ -139,7 +139,7 @@ if __name__ == '__main__':
 	# please complete your code under this blank
         img_out = unnormalize_forplotting(img)
         for idx in range(0,len(landmarks),2):
-            cv2.circle(img_out, (landmarks[idx],landmarks[idx+1]), 2, (0,0,255))
+            cv2.circle(img_out, (landmarks[idx]*train_boarder,landmarks[idx+1]*train_boarder), 2, (0,0,255))
         cv2.imshow('data',img_out)		
 
         key = cv2.waitKey()

@@ -207,7 +207,8 @@ def get_train_test_set(rotation_class):
 
 
 if __name__ == '__main__':
-    rotation_class = Rotation_none
+    #rotation_class = Rotation_none
+    rotation_class = Rotation_allangle
     train_set = load_data('train',rotation_class)
     for sample in train_set:
         img = sample['image']

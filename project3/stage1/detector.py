@@ -14,7 +14,6 @@ import cv2
 
 from data import get_train_test_set
 from data import unnormalize_forplotting
-from predict import predict
 
 torch.set_default_tensor_type(torch.FloatTensor)
 
@@ -49,6 +48,7 @@ class Net(nn.Module):
         self.preluip1 = nn.PReLU()
         self.preluip2 = nn.PReLU()
         self.ave_pool = nn.AvgPool2d(2, 2, ceil_mode=True)
+
 
     def forward(self, x):
         # block 1
@@ -85,9 +85,6 @@ class Net(nn.Module):
         ip3 = self.ip3(ip3)
         # print('ip3 after ip3 shape should be 32x42: ', ip3.shape)
 
-        # get rid of the negatives?? --zma
-        ip3 = self.preluip2(ip3)
-		
         return ip3
 
 
@@ -96,6 +93,8 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
     if args.save_model:
         if not os.path.exists(args.save_directory):
             os.makedirs(args.save_directory)
+
+    fid = open(os.path.join(args.save_directory,args.save_log),'w')
 
     epoch = args.epochs
     pts_criterion = criterion
@@ -111,6 +110,11 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
         # training the model #
         ######################
         model.train()
+
+        train_batch_size = train_loader.batch_size
+        train_batch_cnt = 0
+        train_sum_pts_loss = 0.0
+
         for batch_idx, batch in enumerate(train_loader):
             img = batch['image']
             landmark = batch['landmarks']
@@ -129,6 +133,8 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
 			
             # get loss
             loss = pts_criterion(output_pts, target_pts)
+            train_batch_cnt += len(img)
+            train_sum_pts_loss += loss.item()*len(img)
 			
             # do BP automatically
             loss.backward()
@@ -137,7 +143,7 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
             # show log info
             if batch_idx % args.log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\t pts_loss: {:.6f}'.format(
-                   epoch_id,batch_idx * len(img),
+                   epoch_id,batch_idx * train_batch_size,
                    len(train_loader.dataset),
                    100. * batch_idx / len(train_loader),
                    loss.item()))
@@ -145,16 +151,16 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
         ######################
         # validate the model #
         ######################
-        valid_mean_pts_loss = 0.0
+        valid_sum_pts_loss = 0.0
 
         model.eval()  # prep model for evaluation
         with torch.no_grad():
             valid_batch_cnt = 0
 
             for valid_batch_idx, batch in enumerate(valid_loader):
-                valid_batch_cnt += 1
                 valid_img = batch['image']
                 landmark = batch['landmarks']
+                valid_batch_cnt += len(valid_img)
 
                 input_img = valid_img.to(device)
                 target_pts = landmark.to(device)
@@ -163,15 +169,21 @@ def train(args, train_loader, valid_loader, model, criterion, optimizer, device)
 				
                 valid_loss = pts_criterion(output_pts, target_pts)
 				
-                valid_mean_pts_loss += valid_loss.item()
+                valid_sum_pts_loss += valid_loss.item()*len(valid_img)
 				
-                valid_mean_pts_loss /= valid_batch_cnt * 1.0
-                print('Valid: pts_loss: {:.6f}'.format(valid_mean_pts_loss))
+                print('Valid: pts_loss: {:.6f}'.format(valid_sum_pts_loss/valid_batch_cnt*1.0))
         print('====================================================')
         # save model
         if args.save_model:
             saved_model_name = os.path.join(args.save_directory, 'detector_epoch' + '_' + str(epoch_id) + '.pt')
-            torch.save(model.state_dict(), saved_model_name)
+            torch.save({'model_state_dict':model.state_dict()}, saved_model_name)
+        # write the log
+        fid.write('Epoch: {} train_loss: {:.6f} valid_loss: {:.6f}\n'.format(
+           epoch_id, 
+           train_sum_pts_loss/train_batch_cnt*1.0,
+           valid_sum_pts_loss/valid_batch_cnt*1.0))
+
+    fid.close()
     return loss, 0.5
 
 
@@ -180,6 +192,8 @@ def predict(model,valid_loader):
         img = batch['image']
         landmark_target = batch['landmarks'].numpy()[0,:]    # make this to be array
         landmark_output = model(img).detach().numpy()[0,:]      
+        print(img)
+        print(landmark_output)
         img_out = unnormalize_forplotting(img[0,:,:,:])
 
         W = np.float(img_out.shape[1])
@@ -190,8 +204,6 @@ def predict(model,valid_loader):
 
         for idx in range(0,len(landmark_output),2):
             cv2.circle(img_out, (np.int(landmark_output[idx]*W),np.int(landmark_output[idx+1]*H)), 3, (255,0,0))
-
-        cv2.circle(img_out,(50,50),5,(0,255,0))
 
         cv2.imshow('predict',img_out)
 
@@ -207,10 +219,10 @@ def main_test():
                         help='input batch size for training (default: 64)')
     parser.add_argument('--test-batch-size', type=int, default=64, metavar='N',		
                         help='input batch size for testing (default: 64)')
-    parser.add_argument('--epochs', type=int, default=100, metavar='N',
-                        help='number of epochs to train (default: 100)')
-    parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
-                        help='learning rate (default: 0.001)')
+    parser.add_argument('--epochs', type=int, default=50, metavar='N',
+                        help='number of epochs to train (default: 50)')
+    parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
+                        help='learning rate (default: 0.1)')
     parser.add_argument('--momentum', type=float, default=0.5, metavar='M',
                         help='SGD momentum (default: 0.5)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
@@ -224,7 +236,9 @@ def main_test():
     parser.add_argument('--save-directory', type=str, default='trained_models',
                         help='learnt models are saving here')
     parser.add_argument('--phase', type=str, default='Train',   # Train/train, Predict/predict, Finetune/finetune
-                        help='training, predicting or finetuning')
+                        help='train, predict or finetune')
+    parser.add_argument('--save-log', type=str, default='log.txt',
+                         help='save the log of training')
     args = parser.parse_args()
 	###################################################################################
     torch.manual_seed(args.seed)
@@ -262,7 +276,9 @@ def main_test():
         # how to do predict?
         model_name = input('enter model name: ')
         valid_loader = torch.utils.data.DataLoader(test_set, batch_size=1)
-        model.load_state_dict(torch.load(model_name))
+        model_loaded = torch.load(model_name)
+        model.load_state_dict(model_loaded['model_state_dict'])
+        model.eval()
         predict(model,valid_loader)
 
 
